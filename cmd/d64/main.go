@@ -14,7 +14,6 @@ const Version = "0.1"
 
 var (
 	flagAdd       string
-	flagNew       string
 	flagDirectory string
 	flagExtract   string
 	flagQuiet     bool
@@ -22,11 +21,8 @@ var (
 )
 
 func init() {
-	flag.StringVar(&flagAdd, "add", "", "add files to existing .d64 (-add d64.d64 file1.prg file2.prg)")
+	flag.StringVar(&flagAdd, "add", "", "add files to .d64 (-add d64.d64 file1.prg file2.prg)")
 	flag.StringVar(&flagAdd, "a", "", "add")
-
-	flag.StringVar(&flagNew, "new", "", "create new .d64 (-new d64.d64 file1.prg file2.prg)")
-	flag.StringVar(&flagNew, "n", "", "new")
 
 	flag.StringVar(&flagExtract, "extract", "", "extract .prgs from .d64 (-extract d64.d64)")
 	flag.StringVar(&flagExtract, "e", "", "extract")
@@ -48,17 +44,11 @@ func main() {
 		fmt.Printf("d64 %s by burglar\n", Version)
 	}
 
-	switch {
-	case flagNew != "":
-		if err := newD64(flagNew, files); err != nil {
-			panic(err)
-		}
-		if !flagQuiet {
-			fmt.Printf("created %q with %d files\n", flagNew, len(files))
-		}
-	case flagAdd != "":
+	if flagAdd != "" {
 		if err := addToD64(flagAdd, files); err != nil {
-			panic(err)
+			if err = newD64(flagAdd, files); err != nil {
+				panic(err)
+			}
 		}
 		if !flagQuiet {
 			fmt.Printf("added %d files to %q\n", len(files), flagAdd)
@@ -70,9 +60,10 @@ func main() {
 			panic(err)
 		}
 		if !flagQuiet {
-			fmt.Printf("extracted prg files from %q\n", flagNew)
+			fmt.Printf("extracted prg files from %q\n", flagExtract)
 		}
 	}
+
 	if flagDirectory != "" {
 		if err := printDirectory(flagDirectory); err != nil {
 			panic(err)
