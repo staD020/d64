@@ -65,9 +65,11 @@ func main() {
 	}
 
 	if flagDirectory != "" {
-		if err := printDirectory(flagDirectory); err != nil {
+		d, err := d64.LoadDisk(flagDirectory)
+		if err != nil {
 			panic(err)
 		}
+		fmt.Println(d)
 	}
 
 	if !flagQuiet {
@@ -109,9 +111,7 @@ func addToD64(path string, prgs []string) error {
 	}
 
 	if flagVerbose {
-		if err = printDirectory(path); err != nil {
-			return fmt.Errorf("printDirectory %q failed: %v", path, err)
-		}
+		fmt.Println(d)
 	}
 
 	if err := d.WriteFile(path); err != nil {
@@ -128,21 +128,5 @@ func extractD64(path string) error {
 	if err = d.ExtractToPath("."); err != nil {
 		return fmt.Errorf("d.ExtractToPath %q failed: %v", ".", err)
 	}
-	return nil
-}
-
-func printDirectory(path string) error {
-	d, err := d64.LoadDisk(path)
-	if err != nil {
-		return fmt.Errorf("d64.LoadDisk %q failed: %v", path, err)
-	}
-
-	fmt.Printf("%q\n", d.Name)
-	blocksFree := d64.MaxBlocks
-	for _, e := range d.Directory() {
-		fmt.Printf("%3d %q prg\n", e.BlockSize, e.Filename)
-		blocksFree -= e.BlockSize
-	}
-	fmt.Printf("%3d blocks free\n", blocksFree)
 	return nil
 }

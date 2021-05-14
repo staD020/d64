@@ -42,7 +42,6 @@ type Disk struct {
 	SectorInterleave byte
 	Files            []string
 	bam              [MaxTracks][MaxSectorsForBam]bool
-	loadDisk         []byte
 }
 
 // A DirEntry represents a single file in the directory of this d64.
@@ -107,7 +106,6 @@ func LoadDisk(path string) (*Disk, error) {
 	if err != nil {
 		return d, fmt.Errorf("os.ReadFile %q failed: %v", path, err)
 	}
-	d.loadDisk = data
 
 	d.Tracks = make([]Track, MaxTracks)
 	for track := byte(1); track <= MaxTracks; track++ {
@@ -148,6 +146,18 @@ func NewDisk(name string, interleave byte) *Disk {
 	d.FormatBAM()
 	d.setBamEntries()
 	return d
+}
+
+// String implements the Stringer interface and returns a human readable directory.
+func (d *Disk) String() string {
+	s := fmt.Sprintf("%q\n", d.Name)
+	blocksFree := MaxBlocks
+	for _, e := range d.Directory() {
+		s += fmt.Sprintf("%3d %q prg\n", e.BlockSize, e.Filename)
+		blocksFree -= e.BlockSize
+	}
+	s += fmt.Sprintf("%3d blocks free\n", blocksFree)
+	return s
 }
 
 // WriteTo writes the disk to io.Writer, implementing the io.WriterTo interface.
