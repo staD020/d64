@@ -20,6 +20,10 @@ d64 is a Commodore 64 .d64 diskimage library written in Go.
 * Scratch/delete
 * >35 tracks
 
+## Command-line Interface
+
+`go install github.com/staD020/d64/cmd/d64`
+
 ## Build from source
 
 `go build ./cmd/d64`
@@ -65,7 +69,3 @@ func exampleExtract() {
 	_ = d.ExtractToPath(".")
 }
 ```
-
-## Command-line Interface
-
-`go install github.com/staD020/d64/cmd/d64`
