@@ -16,6 +16,7 @@ var (
 	flagAdd       string
 	flagDirectory string
 	flagExtract   string
+	flagHelp      bool
 	flagQuiet     bool
 	flagVerbose   bool
 )
@@ -30,6 +31,8 @@ func init() {
 	flag.StringVar(&flagDirectory, "dir", "", "prints the directory from .d64 (-dir d64.d64)")
 	flag.StringVar(&flagDirectory, "d", "", "dir")
 
+	flag.BoolVar(&flagHelp, "help", false, "")
+	flag.BoolVar(&flagHelp, "h", false, "help")
 	flag.BoolVar(&flagQuiet, "quiet", false, "only output errors")
 	flag.BoolVar(&flagQuiet, "q", false, "quiet")
 	flag.BoolVar(&flagVerbose, "verbose", false, "")
@@ -44,7 +47,9 @@ func main() {
 		fmt.Printf("d64 %s by burglar\n", Version)
 	}
 
+	showUsage := true
 	if flagAdd != "" {
+		showUsage = false
 		if err := addToD64(flagAdd, files); err != nil {
 			if err = newD64(flagAdd, files); err != nil {
 				panic(err)
@@ -56,6 +61,7 @@ func main() {
 	}
 
 	if flagExtract != "" {
+		showUsage = false
 		if err := extractD64(flagExtract); err != nil {
 			panic(err)
 		}
@@ -65,11 +71,18 @@ func main() {
 	}
 
 	if flagDirectory != "" {
+		showUsage = false
 		d, err := d64.LoadDisk(flagDirectory)
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(d)
+	}
+
+	if showUsage || flagHelp {
+		fmt.Println("Usage: ./d64 [-v -q -h -a foo.d64 -d foo.d64 -e foo.d64] FILE [FILES]")
+		fmt.Println()
+		flag.PrintDefaults()
 	}
 
 	if !flagQuiet {
@@ -78,7 +91,7 @@ func main() {
 }
 
 func newD64(path string, prgs []string) error {
-	d := d64.NewDisk(filepath.Base(path), d64.DefaultSectorInterleave)
+	d := d64.NewDisk(filepath.Base(path), "01 2a", d64.DefaultSectorInterleave)
 	for _, prg := range prgs {
 		name, ext := d64.NormalizeFilename(filepath.Base(prg)), filepath.Ext(prg)
 		if strings.ToLower(ext) == ".prg" {

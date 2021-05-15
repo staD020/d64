@@ -15,6 +15,7 @@ const (
 	BlockSize       = 254 // Usable bytes per sector (block)
 	MaxBlocks       = 664 // Max blocks per .d64 image
 	MaxFilenameSize = 16  // Max filename size
+	MaxDiskIDSize   = 5
 
 	MaxTracks               = 35
 	DirTrack                = 18
@@ -37,7 +38,8 @@ type Track struct {
 
 // A Disk represents a .d64 image.
 type Disk struct {
-	Name             string
+	Label            string
+	DiskID           string
 	Tracks           []Track
 	SectorInterleave byte
 	Files            []string
@@ -133,9 +135,10 @@ func trackSectorToDataOffset(track, sector byte) int {
 }
 
 // NewDisk returns a new formatted *Disk.
-func NewDisk(name string, interleave byte) *Disk {
+func NewDisk(label, diskID string, interleave byte) *Disk {
 	d := &Disk{
-		Name:             name,
+		Label:            label,
+		DiskID:           diskID,
 		SectorInterleave: interleave,
 		Tracks:           make([]Track, MaxTracks),
 	}
@@ -150,7 +153,7 @@ func NewDisk(name string, interleave byte) *Disk {
 
 // String implements the Stringer interface and returns a human readable directory.
 func (d *Disk) String() string {
-	s := fmt.Sprintf("%q\n", d.Name)
+	s := fmt.Sprintf("%q %q\n", d.Label, d.DiskID)
 	blocksFree := MaxBlocks
 	for _, e := range d.Directory() {
 		s += fmt.Sprintf("%3d %q prg\n", e.BlockSize, e.Filename)
@@ -210,12 +213,20 @@ func (d *Disk) FormatBAM() {
 		s.Data[0x90+byte(i)] = 0xa0
 	}
 
-	for i, c := range strings.ToUpper(d.Name) {
+	if len(d.Label) > MaxFilenameSize {
+		d.Label = d.Label[0:MaxFilenameSize]
+	}
+	for i, c := range strings.ToUpper(d.Label) {
 		s.Data[0x90+byte(i)] = byte(c)
 	}
 
-	diskID := strings.ToUpper("votox")
-	for i, c := range diskID {
+	if len(d.DiskID) > MaxDiskIDSize {
+		d.DiskID = d.DiskID[0:MaxDiskIDSize]
+	}
+	for i, c := range strings.ToUpper(d.DiskID) {
+		if c == ' ' {
+			c = 0xa0
+		}
 		s.Data[i+0xa2] = byte(c)
 	}
 
@@ -224,21 +235,37 @@ func (d *Disk) FormatBAM() {
 	d.prepareBam()
 }
 
-// setNameFromBAM sets d.Name according to the data found in the BAM sector.
-func (d *Disk) setNameFromBAM() {
+// setLabelFromBAM sets d.Label and d.DiskID according to the data found in the BAM sector.
+func (d *Disk) setLabelFromBAM() {
 	s := d.Tracks[DirTrack-1].Sectors[0]
 	buf := [MaxFilenameSize]byte{}
 	for i := 0; i < MaxFilenameSize; i++ {
 		buf[i] = s.Data[0x90+i]
 	}
-	var name string
+	var label string
 	for i := range buf {
 		if buf[i] == 0xa0 {
 			break
 		}
-		name += string(buf[i])
+		label += string(buf[i])
 	}
-	d.Name = strings.ToLower(name)
+	d.Label = strings.ToLower(label)
+}
+
+func (d *Disk) setDiskIDFromBAM() {
+	s := d.Tracks[DirTrack-1].Sectors[0]
+	buf := [MaxDiskIDSize]byte{}
+	for i := 0; i < MaxDiskIDSize; i++ {
+		buf[i] = s.Data[0xa2+i]
+	}
+	var diskID string
+	for i := range buf {
+		if buf[i] == 0xa0 {
+			buf[i] = 0x20
+		}
+		diskID += string(buf[i])
+	}
+	d.DiskID = strings.ToLower(diskID)
 }
 
 var reStripSlashes = regexp.MustCompile("[/]")
@@ -268,8 +295,9 @@ func (d *Disk) Extract(track, sector byte) (prg []byte) {
 	return prg
 }
 
-// guessInterleave iterates over all files on disk and sets d.SectorInterleave when guessing is easy.
+// guessInterleave iterates over all files on disk and sets d.SectorInterleave.
 func (d *Disk) guessInterleave() {
+	d.SectorInterleave = DefaultSectorInterleave
 	for _, e := range d.Directory() {
 		s := d.Tracks[e.Track-1].Sectors[e.Sector]
 		if e.Track == s.TrackLink() && e.Sector < s.SectorLink() {
@@ -467,9 +495,10 @@ func (d *Disk) prepareBam() {
 	}
 }
 
-// loadBAM sets d.bam and d.Name according to the BAM entries on the disk.
+// loadBAM sets d.bam and d.Label according to the BAM entries on the disk.
 func (d *Disk) loadBAM() {
-	d.setNameFromBAM()
+	d.setLabelFromBAM()
+	d.setDiskIDFromBAM()
 	bam := d.Tracks[DirTrack-1].Sectors[0]
 	track := byte(0)
 	for i := 4; i < (MaxTracks*4)+4; i += 4 {

@@ -17,7 +17,8 @@ const (
 	testLongPrg  = "testdata/enforcer.prg"
 
 	testD64         = "testdata/lastnight.d64"
-	testD64Name     = "8580 stinsen"
+	testD64Label    = "8580 stinsen"
+	testD64DiskID   = "01 2a"
 	testD64NumFiles = 20
 )
 
@@ -27,10 +28,13 @@ var testFileBlocks = []int{18, 28, 19, 27, 16, 14, 25, 23, 22, 16, 89, 29, 31, 3
 var testPrgs = []string{testPrg1, testPrg2}
 
 func TestNewDisk(t *testing.T) {
-	name := "testnewdisk"
-	d := NewDisk(name, DefaultSectorInterleave)
-	if d.Name != name {
-		t.Errorf("disk label incorrect, got: %q want: %q", d.Name, name)
+	label, diskID := "testnewdisk", "votox"
+	d := NewDisk(label, diskID, DefaultSectorInterleave)
+	if d.Label != label {
+		t.Errorf("disk label incorrect, got: %q want: %q", d.Label, label)
+	}
+	if d.DiskID != diskID {
+		t.Errorf("disk diskID incorrect, got: %q want: %q", d.DiskID, diskID)
 	}
 
 	out, err := ioutil.TempFile("", "testnewdisk.*.d64")
@@ -50,8 +54,11 @@ func TestLoadDisk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDisk %q error: %v", testD64, err)
 	}
-	if d.Name != testD64Name {
-		t.Errorf("LoadDisk Name failed, got %s want %s", d.Name, testD64Name)
+	if d.Label != testD64Label {
+		t.Errorf("LoadDisk Label mismatch, got %s want %s", d.Label, testD64Label)
+	}
+	if d.DiskID != testD64DiskID {
+		t.Errorf("LoadDisk DiskID mismatch, got %s want %s", d.DiskID, testD64DiskID)
 	}
 	if d.SectorInterleave != DefaultSectorInterleave {
 		t.Errorf("LoadDisk SectorInterleave failed, got %d want %d", d.SectorInterleave, DefaultSectorInterleave)
@@ -162,7 +169,7 @@ func TestDiskValidate(t *testing.T) {
 	dirEntries := d.Directory()
 	for i := range testFileBlocks {
 		if dirEntries[i].BlockSize != testFileBlocks[i] {
-			t.Errorf("blocksize incorrect for %q: got %d want %d", d.Name, dirEntries[i].BlockSize, testFileBlocks[i])
+			t.Errorf("blocksize incorrect for %q: got %d want %d", d.Label, dirEntries[i].BlockSize, testFileBlocks[i])
 		}
 	}
 
@@ -172,7 +179,7 @@ func TestDiskValidate(t *testing.T) {
 }
 
 func TestDiskAddFile(t *testing.T) {
-	d := NewDisk("d.addfile", DefaultSectorInterleave)
+	d := NewDisk("d.addfile", "votox", DefaultSectorInterleave)
 
 	prgLengths := []int{}
 	for n, filename := range testPrgs {
@@ -225,8 +232,8 @@ func TestExtractToPath(t *testing.T) {
 }
 
 func TestLongPrg(t *testing.T) {
-	const longInterleave = 9
-	d := NewDisk("long prg", longInterleave)
+	const longInterleave = 8
+	d := NewDisk("long prg", "long", longInterleave)
 	if err := d.AddFile(testLongPrg, "enforcer+6hi/scs"); err != nil {
 		t.Errorf("d.AddFile %q error: %v", testLongPrg, err)
 	}
