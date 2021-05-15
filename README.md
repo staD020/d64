@@ -2,7 +2,7 @@
 
 d64 is a Commodore 64 .d64 diskimage library written in Go.
 
-## Install
+## Install Library
 
 `go get github.com/staD020/d64`
 
@@ -14,11 +14,21 @@ d64 is a Commodore 64 .d64 diskimage library written in Go.
 * Disk Label and 5 char Disk ID
 * Extract all PRGs from a .d64
 
-## Missing Features
+## Bugs & Missing Features
 
-* DEL, REL, SEQ, USR filetypes
+* DEL/REL/SEQ/USR files are ignored, they will be overwritten
+* You can add files with the same filename
 * Scratch/delete
-* >35 tracks
+* 36+ tracks
+* Per file sector interleave
+* DirArt
+* Optional file storage on the DirTrack
+* Custom filenames
+
+I'm actually not planning on handling these or other features, unless I need them myself.
+There are other d64 tools around with far more capabilities, check [cc1541](https://bitbucket.org/PTV_Claus/cc1541) for example.
+
+Pull requests are welcome though.
 
 ## Command-line Interface
 
@@ -26,7 +36,7 @@ d64 is a Commodore 64 .d64 diskimage library written in Go.
 
 ## Build from source
 
-`go build ./cmd/d64`
+`go test -v -cover -bench . -benchmem && go build -v ./cmd/d64`
 
 ## Examples
 
@@ -49,6 +59,7 @@ func main() {
 func exampleNewDisk() {
 	d := d64.NewDisk("a new disk", "01 2a", d64.DefaultSectorInterleave)
 	_ = d.AddFile("foo.prg", "foo")
+	_ = d.AddFile("bar.prg", "bar")
 	_ = d.WriteFile("foo.d64")
 
 	fmt.Println("Directory:")
@@ -57,7 +68,7 @@ func exampleNewDisk() {
 
 func exampleLoadDisk() {
 	d, _ := d64.LoadDisk("foo.d64")
-	_ = d.AddFile("bar.prg", "bar")
+	_ = d.AddFile("baz.prg", "baz")
 	_ = d.WriteFile("foo.d64")
 
 	fmt.Println("Directory:")
