@@ -104,7 +104,7 @@ func (t *Track) TotalSectors() byte {
 // LoadDisk loads an existing disk from path and returns an initialized *Disk.
 func LoadDisk(path string) (*Disk, error) {
 	d := &Disk{SectorInterleave: DefaultSectorInterleave}
-	data, err := os.ReadFile(path)
+	bin, err := os.ReadFile(path)
 	if err != nil {
 		return d, fmt.Errorf("os.ReadFile %q failed: %v", path, err)
 	}
@@ -112,11 +112,10 @@ func LoadDisk(path string) (*Disk, error) {
 	d.Tracks = make([]Track, MaxTracks)
 	for track := byte(1); track <= MaxTracks; track++ {
 		d.FormatTrack(track)
-
 		for sector := byte(0); sector < d.Tracks[track-1].TotalSectors(); sector++ {
 			offset := trackSectorToDataOffset(track, sector)
 			for i := 0; i < 256; i++ {
-				d.Tracks[track-1].Sectors[sector].Data[i] = data[offset+i]
+				d.Tracks[track-1].Sectors[sector].Data[i] = bin[offset+i]
 			}
 		}
 	}
@@ -237,10 +236,9 @@ func (d *Disk) FormatBAM() {
 
 // setLabelFromBAM sets d.Label and d.DiskID according to the data found in the BAM sector.
 func (d *Disk) setLabelFromBAM() {
-	s := d.Tracks[DirTrack-1].Sectors[0]
 	buf := [MaxFilenameSize]byte{}
 	for i := 0; i < MaxFilenameSize; i++ {
-		buf[i] = s.Data[0x90+i]
+		buf[i] = d.Tracks[DirTrack-1].Sectors[0].Data[0x90+i]
 	}
 	var label string
 	for i := range buf {
@@ -253,10 +251,9 @@ func (d *Disk) setLabelFromBAM() {
 }
 
 func (d *Disk) setDiskIDFromBAM() {
-	s := d.Tracks[DirTrack-1].Sectors[0]
 	buf := [MaxDiskIDSize]byte{}
 	for i := 0; i < MaxDiskIDSize; i++ {
-		buf[i] = s.Data[0xa2+i]
+		buf[i] = d.Tracks[DirTrack-1].Sectors[0].Data[0xa2+i]
 	}
 	var diskID string
 	for i := range buf {
@@ -401,10 +398,10 @@ func (d *Disk) FormatDirectory() {
 	s.SetTrackLink(0)
 	s.SetSectorLink(0xff)
 	d.Tracks[DirTrack-1].Sectors[s.ID] = s
-	d.bam[DirTrack-1][1] = true
+	d.bam[DirTrack-1][s.ID] = true
 }
 
-// Directory scans the dirtrack and returns all .prg DirEntries.
+// Directory scans the DirTrack and returns all .prg DirEntries.
 func (d *Disk) Directory() (dir []DirEntry) {
 	dirSectors := make([]Sector, 0, 20)
 	track, sector := byte(DirTrack), byte(1)
@@ -444,12 +441,11 @@ func (d *Disk) Validate() {
 
 // printBam prints bam to stdout.
 func printBam(bam [MaxTracks][MaxSectorsForBam]bool) {
-	for i := 0; i < MaxTracks; i++ {
-		track := i + 1
+	for track := 1; track <= MaxTracks; track++ {
 		fmt.Printf("track %2d: ", track)
-		for sector := range bam[i] {
+		for sector := range bam[track-1] {
 			used := "0"
-			if bam[i][sector] == true {
+			if bam[track-1][sector] == true {
 				used = "1"
 			}
 			fmt.Printf(" %s", used)
@@ -488,8 +484,7 @@ func (d *Disk) setBamEntries() {
 // prepareBam sets impossible sectors to true (used) in d.bam.
 func (d *Disk) prepareBam() {
 	for track := byte(1); track <= MaxTracks; track++ {
-		total := totalSectors(track)
-		for sector := byte(total); sector < MaxSectorsForBam; sector++ {
+		for sector := totalSectors(track); sector < MaxSectorsForBam; sector++ {
 			d.bam[track-1][sector] = true
 		}
 	}
@@ -503,7 +498,6 @@ func (d *Disk) loadBAM() {
 	track := byte(0)
 	for i := 4; i < (MaxTracks*4)+4; i += 4 {
 		track++
-		freeSectors := totalSectors(track)
 		bamBytes := [3]byte{}
 		for j := range bamBytes {
 			bamBytes[j] = bam.Data[i+j+1]
@@ -511,7 +505,6 @@ func (d *Disk) loadBAM() {
 		for sector := byte(0); sector < totalSectors(track); sector++ {
 			d.bam[track-1][sector] = false
 			if bamBytes[sector/8]&(1<<(sector%8)) == 0 {
-				freeSectors--
 				d.bam[track-1][sector] = true
 			}
 		}
@@ -588,7 +581,7 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 	buf := make([]byte, len(prg), len(prg))
 	copy(buf, prg)
 
-	// write full sectors
+	// drain buffer with writing full sectors
 	for len(buf) > BlockSize {
 		d.bam[track-1][sector] = true
 

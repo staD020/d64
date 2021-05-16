@@ -23,7 +23,6 @@ d64 is a Commodore 64 .d64 diskimage library written in Go.
 * Per file sector interleave
 * DirArt
 * Optional file storage on the DirTrack
-* Custom filenames
 
 I'm actually not planning on handling these or other features, unless I need them myself.
 There are other d64 tools around with far more capabilities, check [cc1541](https://bitbucket.org/PTV_Claus/cc1541) for example.
@@ -62,8 +61,7 @@ func exampleNewDisk() {
 	_ = d.AddFile("bar.prg", "bar")
 	_ = d.WriteFile("foo.d64")
 
-	fmt.Println("Directory:")
-	fmt.Println(d)
+	fmt.Println("Directory:\n", d)
 }
 
 func exampleLoadDisk() {
@@ -71,8 +69,7 @@ func exampleLoadDisk() {
 	_ = d.AddFile("baz.prg", "baz")
 	_ = d.WriteFile("foo.d64")
 
-	fmt.Println("Directory:")
-	fmt.Println(d)
+	fmt.Println("Directory:\n", d)
 }
 
 func exampleExtract() {

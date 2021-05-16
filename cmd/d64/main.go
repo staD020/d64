@@ -24,10 +24,8 @@ var (
 func init() {
 	flag.StringVar(&flagAdd, "add", "", "add files to .d64 (-add d64.d64 file1.prg file2.prg)")
 	flag.StringVar(&flagAdd, "a", "", "add")
-
 	flag.StringVar(&flagExtract, "extract", "", "extract .prgs from .d64 (-extract d64.d64)")
 	flag.StringVar(&flagExtract, "e", "", "extract")
-
 	flag.StringVar(&flagDirectory, "dir", "", "prints the directory from .d64 (-dir d64.d64)")
 	flag.StringVar(&flagDirectory, "d", "", "dir")
 
@@ -80,7 +78,7 @@ func main() {
 	}
 
 	if showUsage || flagHelp {
-		fmt.Println("Usage: ./d64 [-v -q -h -a foo.d64 -d foo.d64 -e foo.d64] FILE [FILES]")
+		fmt.Println("Usage: ./d64 [-v -q -h -a foo.d64 -d foo.d64 -e foo.d64] [FILE [FILES]]")
 		fmt.Println()
 		flag.PrintDefaults()
 	}
@@ -103,6 +101,10 @@ func newD64(path string, prgs []string) error {
 	}
 	if err := d.WriteFile(path); err != nil {
 		return fmt.Errorf("d.WriteFile %q failed: %v", path, err)
+	}
+
+	if flagVerbose {
+		fmt.Println(d)
 	}
 	return nil
 }
@@ -138,6 +140,11 @@ func extractD64(path string) error {
 	if err != nil {
 		return fmt.Errorf("d64.LoadDisk %q failed: %v", path, err)
 	}
+
+	if flagVerbose {
+		fmt.Println(d)
+	}
+
 	if err = d.ExtractToPath("."); err != nil {
 		return fmt.Errorf("d.ExtractToPath %q failed: %v", ".", err)
 	}

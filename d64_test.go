@@ -190,7 +190,7 @@ func TestDiskAddFile(t *testing.T) {
 		prgLengths = append(prgLengths, len(prg))
 
 		if err = d.AddPrg("file "+strconv.Itoa(n), prg); err != nil {
-			t.Fatalf("d.AddFile %q failed: %v", filename, err)
+			t.Fatalf("d.AddPrg %q failed: %v", filename, err)
 		}
 	}
 
