@@ -106,7 +106,7 @@ func LoadDisk(path string) (*Disk, error) {
 	d := &Disk{SectorInterleave: DefaultSectorInterleave}
 	bin, err := os.ReadFile(path)
 	if err != nil {
-		return d, fmt.Errorf("os.ReadFile %q failed: %v", path, err)
+		return d, fmt.Errorf("os.ReadFile %q failed: %w", path, err)
 	}
 
 	d.Tracks = make([]Track, MaxTracks)
@@ -170,7 +170,7 @@ func (d *Disk) WriteTo(w io.Writer) (int64, error) {
 			m, err := w.Write(s.Data[:])
 			n += int64(m)
 			if err != nil {
-				return n, fmt.Errorf("w.Write failed: %v", err)
+				return n, fmt.Errorf("w.Write failed: %w", err)
 			}
 		}
 	}
@@ -181,11 +181,11 @@ func (d *Disk) WriteTo(w io.Writer) (int64, error) {
 func (d *Disk) WriteFile(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("os.Create %q failed: %v", path, err)
+		return fmt.Errorf("os.Create %q failed: %w", path, err)
 	}
 	defer f.Close()
 	if _, err = d.WriteTo(f); err != nil {
-		return fmt.Errorf("d.WriteTo %q failed: %v", path, err)
+		return fmt.Errorf("d.WriteTo %q failed: %w", path, err)
 	}
 	return nil
 }
@@ -234,7 +234,7 @@ func (d *Disk) FormatBAM() {
 	d.prepareBam()
 }
 
-// setLabelFromBAM sets d.Label and d.DiskID according to the data found in the BAM sector.
+// setLabelFromBAM sets d.Label according to the data found in the BAM sector.
 func (d *Disk) setLabelFromBAM() {
 	buf := [MaxFilenameSize]byte{}
 	for i := 0; i < MaxFilenameSize; i++ {
@@ -250,6 +250,7 @@ func (d *Disk) setLabelFromBAM() {
 	d.Label = strings.ToLower(label)
 }
 
+// setDiskIDFromBAM sets d.DiskID according to the data found in the BAM sector.
 func (d *Disk) setDiskIDFromBAM() {
 	buf := [MaxDiskIDSize]byte{}
 	for i := 0; i < MaxDiskIDSize; i++ {
@@ -272,7 +273,7 @@ func (d *Disk) ExtractToPath(outDir string) error {
 	for _, e := range d.Directory() {
 		path := filepath.Join(outDir, reStripSlashes.ReplaceAllString(e.Filename, "")+".prg")
 		if err := os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
-			return fmt.Errorf("os.WriteFile %q to %q failed: %v", e.Filename, outDir, err)
+			return fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
 		}
 		d.Files = append(d.Files, path)
 	}
@@ -378,7 +379,7 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 	// allocate new dir sector
 	nextTrack, nextSector, err := d.nextFreeSector(byte(track), byte(sector))
 	if err != nil {
-		return fmt.Errorf("d.nextFreeSector for dir entry %q failed: %v", name, err)
+		return fmt.Errorf("d.nextFreeSector for dir entry %q failed: %w", name, err)
 
 	}
 	d.Tracks[track-1].Sectors[sector].Data[0] = nextTrack
@@ -559,7 +560,7 @@ func (d *Disk) nextFreeSector(currentTrack, currentSector byte) (track, sector b
 func (d *Disk) AddFile(path, filename string) error {
 	prg, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("os.ReadFile %q failed: %v", path, err)
+		return fmt.Errorf("os.ReadFile %q failed: %w", path, err)
 	}
 	return d.AddPrg(NormalizeFilename(filename), prg)
 }
@@ -571,11 +572,11 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 	}
 	track, sector, err := d.freeSector()
 	if err != nil {
-		return fmt.Errorf("d.freeSector failed: %v", err)
+		return fmt.Errorf("d.freeSector failed: %w", err)
 	}
 
 	if err = d.addFileToDirectory(track, sector, filename, len(prg)); err != nil {
-		return fmt.Errorf("d.addFileToDirectory %q failed: %v", filename, err)
+		return fmt.Errorf("d.addFileToDirectory %q failed: %w", filename, err)
 	}
 
 	buf := make([]byte, len(prg), len(prg))
@@ -590,7 +591,7 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 
 		nextTrack, nextSector, err := d.nextFreeSector(track, sector)
 		if err != nil {
-			return fmt.Errorf("d.nextFreeSector track %d sector %d failed: %v", track, sector, err)
+			return fmt.Errorf("d.nextFreeSector track %d sector %d failed: %w", track, sector, err)
 		}
 
 		d.Tracks[track-1].Sectors[sector].Data[0] = nextTrack
