@@ -345,7 +345,7 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 	track, sector := DirTrack, 1
 
 	// find empty spot in current dir sectors
-	for k := 0; k < 20; k++ {
+	for k := 0; k < len(d.Tracks[track-1].Sectors); k++ {
 		s := d.Tracks[track-1].Sectors[sector]
 		for i := 2; i < 0xff; i += 32 {
 			if s.Data[i] == 0x82 || s.Data[i] == 0xc2 {
@@ -364,7 +364,7 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 			}
 			b := SizeToBlocks(prgLength)
 			s.Data[i+28] = byte(b) & 0xff
-			s.Data[i+29] = byte((b & 0xff00) >> 8)
+			s.Data[i+29] = byte(b >> 8)
 
 			d.Tracks[track-1].Sectors[sector] = s
 			return nil
@@ -404,9 +404,9 @@ func (d *Disk) FormatDirectory() {
 
 // Directory scans the DirTrack and returns all .prg DirEntries.
 func (d *Disk) Directory() (dir []DirEntry) {
-	dirSectors := make([]Sector, 0, 20)
 	track, sector := byte(DirTrack), byte(1)
-	for i := 0; i < 20; i++ {
+	dirSectors := make([]Sector, 0, totalSectors(DirTrack))
+	for i := byte(0); i < totalSectors(DirTrack); i++ {
 		s := d.Tracks[track-1].Sectors[sector]
 		dirSectors = append(dirSectors, s)
 		if s.TrackLink() == 0 {
