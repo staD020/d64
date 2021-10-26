@@ -226,7 +226,7 @@ func TestExtractToPath(t *testing.T) {
 		t.Fatalf("LoadDisk %q error: %v", testD64, err)
 	}
 
-	if err = d.ExtractToPath(out); err != nil {
+	if _, err = d.ExtractToPath(out); err != nil {
 		t.Fatalf("d.ExtractToPath %q to %q error: %v", testD64, out, err)
 	}
 }

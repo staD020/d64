@@ -42,7 +42,6 @@ type Disk struct {
 	DiskID           string
 	Tracks           []Track
 	SectorInterleave byte
-	Files            []string
 	bam              [MaxTracks][MaxSectorsForBam]bool
 }
 
@@ -268,17 +267,17 @@ func (d *Disk) setDiskIDFromBAM() {
 
 var reStripSlashes = regexp.MustCompile("[/]")
 
-// ExtractToPath writes all files to outDir and sets d.Files to a slice containing all paths.
-func (d *Disk) ExtractToPath(outDir string) error {
-	d.Files = []string{}
+// ExtractToPath writes all files to outDir and returns a slice containing all paths.
+func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
+	paths = []string{}
 	for _, e := range d.Directory() {
 		path := filepath.Join(outDir, reStripSlashes.ReplaceAllString(e.Filename, "")+".prg")
-		if err := os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
-			return fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
+		if err = os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
+			return paths, fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
 		}
-		d.Files = append(d.Files, path)
+		paths = append(paths, path)
 	}
-	return nil
+	return paths, nil
 }
 
 // Extract returns the prg starting on track, sector.
