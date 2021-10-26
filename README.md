@@ -74,6 +74,6 @@ func exampleLoadDisk() {
 
 func exampleExtract() {
 	d, _ := d64.LoadDisk("foo.d64")
-	_ = d.ExtractToPath(".")
+	_, _ = d.ExtractToPath(".")
 }
 ```
