@@ -14,7 +14,7 @@ import (
 const (
 	BlockSize       = 254 // Usable bytes per sector (block)
 	MaxBlocks       = 664 // Max blocks per .d64 image
-	MaxFilenameSize = 16  // Max filename size
+	MaxFilenameSize = 16
 	MaxDiskIDSize   = 5
 
 	MaxTracks               = 35
@@ -55,7 +55,7 @@ type DirEntry struct {
 }
 
 // TrackLink returns this sectors next track-link.
-func (s *Sector) TrackLink() byte {
+func (s Sector) TrackLink() byte {
 	return s.Data[0]
 }
 
@@ -65,7 +65,7 @@ func (s *Sector) SetTrackLink(b byte) {
 }
 
 // SectorLink returns this sectors next sector-link.
-func (s *Sector) SectorLink() byte {
+func (s Sector) SectorLink() byte {
 	return s.Data[1]
 }
 
@@ -75,7 +75,7 @@ func (s *Sector) SetSectorLink(b byte) {
 }
 
 // Content returns the binary content of this sector, track&sector link are not included.
-func (s *Sector) Content() []byte {
+func (s Sector) Content() []byte {
 	if s.TrackLink() == 0 {
 		return s.Data[2 : s.SectorLink()+1]
 	}
@@ -97,7 +97,7 @@ func totalSectors(track byte) byte {
 }
 
 // TotalSectors returns the total amount of sectors of this track.
-func (t *Track) TotalSectors() byte {
+func (t Track) TotalSectors() byte {
 	return totalSectors(t.ID)
 }
 
@@ -151,7 +151,7 @@ func NewDisk(label, diskID string, interleave byte) *Disk {
 }
 
 // String implements the Stringer interface and returns a human readable directory.
-func (d *Disk) String() string {
+func (d Disk) String() string {
 	s := fmt.Sprintf("%q %q\n", d.Label, d.DiskID)
 	blocksFree := MaxBlocks
 	for _, e := range d.Directory() {
@@ -163,7 +163,7 @@ func (d *Disk) String() string {
 }
 
 // WriteTo writes the disk to io.Writer, implementing the io.WriterTo interface.
-func (d *Disk) WriteTo(w io.Writer) (int64, error) {
+func (d Disk) WriteTo(w io.Writer) (int64, error) {
 	var n int64
 	for _, t := range d.Tracks {
 		for _, s := range t.Sectors {
@@ -178,7 +178,7 @@ func (d *Disk) WriteTo(w io.Writer) (int64, error) {
 }
 
 // WriteFile writes the disk to path.
-func (d *Disk) WriteFile(path string) error {
+func (d Disk) WriteFile(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("os.Create %q failed: %w", path, err)
@@ -194,7 +194,7 @@ func (d *Disk) WriteFile(path string) error {
 func (d *Disk) FormatTrack(id byte) {
 	t := Track{ID: id}
 	t.Sectors = make([]Sector, t.TotalSectors())
-	for i := byte(0); i < t.TotalSectors(); i++ {
+	for i := byte(0); i < byte(len(t.Sectors)); i++ {
 		t.Sectors[i] = Sector{ID: i}
 		d.bam[id-1][i] = false
 	}
@@ -268,8 +268,9 @@ func (d *Disk) setDiskIDFromBAM() {
 
 var reStripSlashes = regexp.MustCompile("[/]")
 
-// ExtractToPath writes all files to outDir.
+// ExtractToPath writes all files to outDir and sets d.Files to a slice containing all paths.
 func (d *Disk) ExtractToPath(outDir string) error {
+	d.Files = []string{}
 	for _, e := range d.Directory() {
 		path := filepath.Join(outDir, reStripSlashes.ReplaceAllString(e.Filename, "")+".prg")
 		if err := os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
@@ -281,7 +282,7 @@ func (d *Disk) ExtractToPath(outDir string) error {
 }
 
 // Extract returns the prg starting on track, sector.
-func (d *Disk) Extract(track, sector byte) (prg []byte) {
+func (d Disk) Extract(track, sector byte) (prg []byte) {
 	for {
 		s := d.Tracks[track-1].Sectors[sector]
 		prg = append(prg, s.Content()...)
@@ -306,7 +307,7 @@ func (d *Disk) guessInterleave() {
 }
 
 // directoryEntries returns the DirEntries of a specific (directory) sector.
-func (s *Sector) directoryEntries() (dirEntries []DirEntry) {
+func (s Sector) directoryEntries() (dirEntries []DirEntry) {
 	for i := 2; i < 0xff; i += 32 {
 		if s.Data[i] != 0x82 && s.Data[i] != 0xc2 {
 			continue
@@ -403,7 +404,7 @@ func (d *Disk) FormatDirectory() {
 }
 
 // Directory scans the DirTrack and returns all .prg DirEntries.
-func (d *Disk) Directory() (dir []DirEntry) {
+func (d Disk) Directory() (dir []DirEntry) {
 	track, sector := byte(DirTrack), byte(1)
 	dirSectors := make([]Sector, 0, totalSectors(DirTrack))
 	for i := byte(0); i < totalSectors(DirTrack); i++ {
@@ -514,7 +515,7 @@ func (d *Disk) loadBAM() {
 
 // freeSector returns the first unallocated sector on the disk.
 // returns error if the disk is full.
-func (d *Disk) freeSector() (track, sector byte, err error) {
+func (d Disk) freeSector() (track, sector byte, err error) {
 	for track = 1; track <= MaxTracks; track++ {
 		if track == DirTrack {
 			continue
@@ -530,7 +531,7 @@ func (d *Disk) freeSector() (track, sector byte, err error) {
 
 // nextFreeSector returns the next unallocated sector, taking SectorInterleave into account.
 // It will skip over the DirTrack, unless you are trying to find the next directory sector.
-func (d *Disk) nextFreeSector(currentTrack, currentSector byte) (track, sector byte, err error) {
+func (d Disk) nextFreeSector(currentTrack, currentSector byte) (track, sector byte, err error) {
 	interleave := byte(d.SectorInterleave)
 	dirSector := currentTrack == DirTrack
 	if dirSector {
