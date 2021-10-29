@@ -145,7 +145,7 @@ func extractD64(path string) error {
 		fmt.Println(d)
 	}
 
-	if err = d.ExtractToPath("."); err != nil {
+	if _, err = d.ExtractToPath("."); err != nil {
 		return fmt.Errorf("d.ExtractToPath %q failed: %v", ".", err)
 	}
 	return nil
