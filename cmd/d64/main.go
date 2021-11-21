@@ -10,7 +10,7 @@ import (
 	"github.com/staD020/d64"
 )
 
-const Version = "0.1"
+const Version = "0.2"
 
 var (
 	flagAdd       string

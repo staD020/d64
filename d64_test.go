@@ -20,6 +20,8 @@ const (
 	testD64Label    = "8580 stinsen"
 	testD64DiskID   = "01 2a"
 	testD64NumFiles = 20
+
+	testWeirdD64 = "testdata/fuji_vol1.d64"
 )
 
 var testFileLength = []int{4421, 6921, 4752, 6675, 3918, 3471, 6251, 5710, 5578, 4011, 22529, 7325, 7794, 8964, 7768, 9452, 8948, 6306, 7339, 25089}
@@ -94,6 +96,26 @@ func TestDiskExtract(t *testing.T) {
 		}
 		if len(prg) != testFileLength[n] {
 			t.Errorf("d.Extract(%d, %d) length got %d want %d.", e.Track, e.Sector, len(prg), testFileLength[n])
+		}
+	}
+}
+
+func TestDiskExtract2(t *testing.T) {
+	d, err := LoadDisk(testWeirdD64)
+	if err != nil {
+		t.Fatalf("LoadDisk %q error: %v", testD64, err)
+	}
+	for n, e := range d.Directory() {
+		prg := d.Extract(e.Track, e.Sector)
+		if len(prg) == 0 {
+			t.Errorf("d.Extract(%d, %d) length got %d want > 0", e.Track, e.Sector, len(prg))
+		}
+		if n == 0 {
+			const want = 14224
+			got := len(prg)
+			if got != want {
+				t.Errorf("d.Extract(%d, %d) %q length incorrect: got %d want %d", e.Track, e.Sector, e.Filename, got, want)
+			}
 		}
 	}
 }

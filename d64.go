@@ -75,7 +75,7 @@ func (s *Sector) SetSectorLink(b byte) {
 
 // Content returns the binary content of this sector, track&sector link are not included.
 func (s Sector) Content() []byte {
-	if s.TrackLink() == 0 {
+	if s.TrackLink() == 0 && s.SectorLink()+1 != 0 {
 		return s.Data[2 : s.SectorLink()+1]
 	}
 	return s.Data[2:]
