@@ -19,15 +19,19 @@ const (
 
 	MaxTracks               = 35
 	DirTrack                = 18
+	SectorSize              = 0x100
 	DefaultSectorInterleave = 10
 	DirInterleave           = 3
 	MaxSectorsForBam        = 24
+	FileIDMask              = 0b10111111
+	PrgFileID               = 0x82
+	AlternateSpaceCharacter = 0xa0
 )
 
 // A Sector represents a single sector.
 type Sector struct {
 	ID   byte
-	Data [256]byte
+	Data [SectorSize]byte
 }
 
 // A Track represents a single track, consisting of multiple Sectors.
@@ -73,8 +77,8 @@ func (s *Sector) SetSectorLink(b byte) {
 	s.Data[1] = b
 }
 
-// Content returns the binary content of this sector, track&sector link are not included.
-func (s Sector) Content() []byte {
+// Bytes returns the binary content of this sector, track&sector link are not included.
+func (s Sector) Bytes() []byte {
 	if s.TrackLink() == 0 && s.SectorLink()+1 != 0 {
 		return s.Data[2 : s.SectorLink()+1]
 	}
@@ -113,7 +117,7 @@ func LoadDisk(path string) (*Disk, error) {
 		d.FormatTrack(track)
 		for sector := byte(0); sector < d.Tracks[track-1].TotalSectors(); sector++ {
 			offset := trackSectorToDataOffset(track, sector)
-			for i := 0; i < 256; i++ {
+			for i := 0; i < SectorSize; i++ {
 				d.Tracks[track-1].Sectors[sector].Data[i] = bin[offset+i]
 			}
 		}
@@ -125,9 +129,9 @@ func LoadDisk(path string) (*Disk, error) {
 
 // trackSectorToDataOffset returns the offset in the .d64 of the given track and sector.
 func trackSectorToDataOffset(track, sector byte) int {
-	offset := int(sector) * 256
+	offset := int(sector) * SectorSize
 	for t := byte(1); t < track; t++ {
-		offset += int(totalSectors(t)) * 256
+		offset += int(totalSectors(t)) * SectorSize
 	}
 	return offset
 }
@@ -208,7 +212,7 @@ func (d *Disk) FormatBAM() {
 	s.Data[2] = byte('A')
 
 	for i := 0; i < 0x1a; i++ {
-		s.Data[0x90+byte(i)] = 0xa0
+		s.Data[0x90+byte(i)] = AlternateSpaceCharacter
 	}
 
 	if len(d.Label) > MaxFilenameSize {
@@ -223,7 +227,7 @@ func (d *Disk) FormatBAM() {
 	}
 	for i, c := range strings.ToUpper(d.DiskID) {
 		if c == ' ' {
-			c = 0xa0
+			c = AlternateSpaceCharacter
 		}
 		s.Data[i+0xa2] = byte(c)
 	}
@@ -239,14 +243,13 @@ func (d *Disk) setLabelFromBAM() {
 	for i := 0; i < MaxFilenameSize; i++ {
 		buf[i] = d.Tracks[DirTrack-1].Sectors[0].Data[0x90+i]
 	}
-	var label string
+	d.Label = ""
 	for i := range buf {
-		if buf[i] == 0xa0 {
+		if buf[i] == AlternateSpaceCharacter {
 			break
 		}
-		label += string(buf[i])
+		d.Label += strings.ToLower(string(buf[i]))
 	}
-	d.Label = strings.ToLower(label)
 }
 
 // setDiskIDFromBAM sets d.DiskID according to the data found in the BAM sector.
@@ -255,14 +258,13 @@ func (d *Disk) setDiskIDFromBAM() {
 	for i := 0; i < MaxDiskIDSize; i++ {
 		buf[i] = d.Tracks[DirTrack-1].Sectors[0].Data[0xa2+i]
 	}
-	var diskID string
+	d.DiskID = ""
 	for i := range buf {
-		if buf[i] == 0xa0 {
-			buf[i] = 0x20
+		if buf[i] == AlternateSpaceCharacter {
+			buf[i] = ' '
 		}
-		diskID += string(buf[i])
+		d.DiskID += strings.ToLower(string(buf[i]))
 	}
-	d.DiskID = strings.ToLower(diskID)
 }
 
 var reStripSlashes = regexp.MustCompile("[/]")
@@ -283,7 +285,7 @@ func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 func (d Disk) Extract(track, sector byte) (prg []byte) {
 	for {
 		s := d.Tracks[track-1].Sectors[sector]
-		prg = append(prg, s.Content()...)
+		prg = append(prg, s.Bytes()...)
 		if s.TrackLink() == 0 {
 			break
 		}
@@ -306,13 +308,13 @@ func (d *Disk) guessInterleave() {
 
 // directoryEntries returns the DirEntries of a specific (directory) sector.
 func (s Sector) directoryEntries() (dirEntries []DirEntry) {
-	for i := 2; i < 0xff; i += 32 {
-		if s.Data[i] != 0x82 && s.Data[i] != 0xc2 {
+	for i := 2; i < SectorSize; i += 32 {
+		if s.Data[i]&FileIDMask != PrgFileID {
 			continue
 		}
 		var filename string
 		for j := 0; j < MaxFilenameSize; j++ {
-			if s.Data[i+3+j] == 0xa0 {
+			if s.Data[i+3+j] == AlternateSpaceCharacter {
 				break
 			}
 			filename += string(s.Data[i+3+j])
@@ -328,7 +330,7 @@ func (s Sector) directoryEntries() (dirEntries []DirEntry) {
 			Filename:  NormalizeFilename(filename),
 			Track:     track,
 			Sector:    sector,
-			BlockSize: int(s.Data[i+28]) + int(s.Data[i+29])*0x100,
+			BlockSize: int(s.Data[i+28]) + int(s.Data[i+29])<<8,
 		})
 	}
 	return dirEntries
@@ -347,11 +349,12 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 	for k := 0; k < len(d.Tracks[track-1].Sectors); k++ {
 		s := d.Tracks[track-1].Sectors[sector]
 		for i := 2; i < 0xff; i += 32 {
-			if s.Data[i] == 0x82 || s.Data[i] == 0xc2 {
+			// keep prg files
+			if s.Data[i]&FileIDMask == PrgFileID {
 				continue
 			}
 			// insert file
-			s.Data[i] = 0x82
+			s.Data[i] = PrgFileID
 			s.Data[i+1] = firstTrack
 			s.Data[i+2] = firstSector
 			for j, v := range name {
@@ -359,7 +362,7 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 			}
 
 			for j := len(name); j < MaxFilenameSize; j++ {
-				s.Data[i+3+j] = 0xa0
+				s.Data[i+3+j] = AlternateSpaceCharacter
 			}
 			b := SizeToBlocks(prgLength)
 			s.Data[i+28] = byte(b) & 0xff
@@ -372,7 +375,8 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 		if s.TrackLink() == 0 {
 			break
 		}
-		track, sector = int(s.TrackLink()), int(s.SectorLink())
+		track = int(s.TrackLink())
+		sector = int(s.SectorLink())
 	}
 
 	// allocate new dir sector
