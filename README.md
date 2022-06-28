@@ -76,4 +76,16 @@ func exampleExtract() {
 	d, _ := d64.LoadDisk("foo.d64")
 	_, _ = d.ExtractToPath(".")
 }
+
+func exampleReaderWriter() {
+	d := d64.NewDisk("a new disk", "01 2a", d64.DefaultSectorInterleave)
+	r, _ := os.Open("foo.prg")
+	defer r.Close()
+	_ = d.AddPrgFromReader("foo", r)
+	w, _ := os.Create("foo.d64")
+	defer w.Close()
+	_, _ = d.WriteTo(w)
+
+	fmt.Println("Directory:\n", d)
+}
 ```

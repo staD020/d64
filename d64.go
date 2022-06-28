@@ -408,18 +408,13 @@ func (d *Disk) FormatDirectory() {
 // Directory scans the DirTrack and returns all .prg DirEntries.
 func (d Disk) Directory() (dir []DirEntry) {
 	track, sector := byte(DirTrack), byte(1)
-	dirSectors := make([]Sector, 0, totalSectors(DirTrack))
 	for i := byte(0); i < totalSectors(DirTrack); i++ {
 		s := d.Tracks[track-1].Sectors[sector]
-		dirSectors = append(dirSectors, s)
+		dir = append(dir, s.directoryEntries()...)
 		if s.TrackLink() == 0 {
-			break
+			return dir
 		}
 		track, sector = s.TrackLink(), s.SectorLink()
-	}
-
-	for _, s := range dirSectors {
-		dir = append(dir, s.directoryEntries()...)
 	}
 	return dir
 }
@@ -443,19 +438,32 @@ func (d *Disk) Validate() {
 	return
 }
 
-// printBam prints bam to stdout.
-func printBam(bam [MaxTracks][MaxSectorsForBam]bool) {
+// PrintBamTo prints a human readable representation of d.bam to the io.Writer.
+// Typical usage is writing to os.Stdout.
+func (d *Disk) PrintBamTo(w io.Writer) (n int, err error) {
 	for track := 1; track <= MaxTracks; track++ {
-		fmt.Printf("track %2d: ", track)
-		for sector := range bam[track-1] {
+		n, err = fmt.Fprintf(w, "track %2d: ", track)
+		if err != nil {
+			return n, fmt.Errorf("fmt.Fprintf failed: %w", err)
+		}
+		for sector := range d.bam[track-1] {
 			used := "0"
-			if bam[track-1][sector] == true {
+			if d.bam[track-1][sector] == true {
 				used = "1"
 			}
-			fmt.Printf(" %s", used)
+			m, err := fmt.Fprintf(w, " %s", used)
+			n += m
+			if err != nil {
+				return n, fmt.Errorf("fmt.Fprintf failed: %w", err)
+			}
 		}
-		fmt.Println()
+		m, err := fmt.Fprintln(w)
+		n += m
+		if err != nil {
+			return n, fmt.Errorf("fmt.Fprintf failed: %w", err)
+		}
 	}
+	return n, nil
 }
 
 // setBamEntries calculates and sets all BAM entries according to d.bam.
@@ -568,6 +576,14 @@ func (d *Disk) AddFile(path, filename string) error {
 	return d.AddPrg(NormalizeFilename(filename), prg)
 }
 
+func (d *Disk) AddPrgFromReader(filename string, r io.Reader) error {
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("io.ReadAll %q failed: %w", filename, err)
+	}
+	return d.AddPrg(filename, buf)
+}
+
 // AddPrg adds the prg to the disk with filename.
 func (d *Disk) AddPrg(filename string, prg []byte) error {
 	if len(prg) == 0 {
@@ -606,13 +622,15 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 		track, sector = nextTrack, nextSector
 	}
 
-	// write partial last sector
-	d.Tracks[track-1].Sectors[sector].Data[0] = 0
-	d.Tracks[track-1].Sectors[sector].Data[1] = byte(len(buf) + 1)
-	for i, v := range buf {
-		d.Tracks[track-1].Sectors[sector].Data[2+i] = v
+	if len(buf) > 0 {
+		// write partial last sector
+		d.bam[track-1][sector] = true
+		d.Tracks[track-1].Sectors[sector].Data[0] = 0
+		d.Tracks[track-1].Sectors[sector].Data[1] = byte(len(buf) + 1)
+		for i, v := range buf {
+			d.Tracks[track-1].Sectors[sector].Data[2+i] = v
+		}
 	}
-	d.bam[track-1][sector] = true
 
 	d.setBamEntries()
 	return nil
