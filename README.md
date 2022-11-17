@@ -31,7 +31,7 @@ Pull requests are welcome though.
 
 ## Command-line Interface
 
-`go install github.com/staD020/d64/cmd/d64`
+`go install github.com/staD020/d64/cmd/d64@latest`
 
 ## Build from source
 
