@@ -294,6 +294,12 @@ func (d Disk) Extract(track, sector byte) (prg []byte) {
 	return prg
 }
 
+// ExtractBoot returns the first prg found in the directory.
+func (d Disk) ExtractBoot() (prg []byte) {
+	bootEntry := d.Directory()[0]
+	return d.Extract(bootEntry.Track, bootEntry.Sector)
+}
+
 // guessInterleave iterates over all files on disk and sets d.SectorInterleave.
 func (d *Disk) guessInterleave() {
 	d.SectorInterleave = DefaultSectorInterleave
