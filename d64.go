@@ -272,10 +272,11 @@ var reStripSlashes = regexp.MustCompile("[/]")
 // ExtractToPath writes all files to outDir and returns a slice containing all paths.
 func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 	for i, e := range d.Directory() {
-		path := filepath.Join(outDir, reStripSlashes.ReplaceAllString(e.Filename, "")+".prg")
-		if path == ".prg" {
-			path = fmt.Sprintf("file%d.prg", i)
+		filename := reStripSlashes.ReplaceAllString(e.Filename, "")
+		if filename == "" {
+			filename = fmt.Sprintf("file%d", i)
 		}
+		path := filepath.Join(outDir, filename)
 		if err = os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
 			return paths, fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
 		}
