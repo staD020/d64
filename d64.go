@@ -276,7 +276,7 @@ func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 		if filename == "" {
 			filename = fmt.Sprintf("file%d", i)
 		}
-		path := filepath.Join(outDir, filename)
+		path := filepath.Join(outDir, filename+".prg")
 		if err = os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
 			return paths, fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
 		}
