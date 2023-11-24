@@ -307,6 +307,9 @@ func TestNormalizeFilename(t *testing.T) {
 	}{
 		{"", ""},
 		{".", "dot"},
+		{"./", "dot"},
+		{"..", "dot"},
+		{"../", "dot"},
 		{"filename", "filename"},
 		{"File.Name", "file.name"},
 		{" filename ", "filename"},

@@ -651,7 +651,7 @@ var re = regexp.MustCompile("[^0-9a-z ._+]")
 // NormalizeFilename trims and normalizes a filename to fit .d64 restrictions.
 func NormalizeFilename(f string) string {
 	n := strings.TrimSpace(re.ReplaceAllString(strings.ToLower(f), ""))
-	if n == "." {
+	if n == "." || n == ".." {
 		return "dot"
 	}
 	if len(n) > MaxFilenameSize {
