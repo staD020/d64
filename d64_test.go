@@ -306,14 +306,15 @@ func TestNormalizeFilename(t *testing.T) {
 		in, want string
 	}{
 		{"", ""},
+		{".", "dot"},
 		{"filename", "filename"},
 		{"File.Name", "file.name"},
 		{" filename ", "filename"},
 		{"	filename	", "filename"},
 		{"1234567890123456", "1234567890123456"},
-		{"123^4567-8901#23,456", "1234567-89012345"},
+		{"123^4567-8901#23,4567", "1234567890123456"},
 		{"12345678901234567", "1234567890123456"},
-		{"enforcer+6hi/[_]", "enforcer+6hi/[_]"},
+		{"enforcer+6hi/[_]", "enforcer+6hi_"},
 	}
 	for _, c := range cases {
 		got := NormalizeFilename(c.in)

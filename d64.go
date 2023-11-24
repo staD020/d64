@@ -646,11 +646,14 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 	return nil
 }
 
-var re = regexp.MustCompile("[^0-9a-z ./\\-_+\\[\\]]")
+var re = regexp.MustCompile("[^0-9a-z ._+]")
 
 // NormalizeFilename trims and normalizes a filename to fit .d64 restrictions.
 func NormalizeFilename(f string) string {
 	n := strings.TrimSpace(re.ReplaceAllString(strings.ToLower(f), ""))
+	if n == "." {
+		return "dot"
+	}
 	if len(n) > MaxFilenameSize {
 		return strings.TrimSpace(n[:MaxFilenameSize])
 	}
