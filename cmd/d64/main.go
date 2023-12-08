@@ -42,7 +42,7 @@ func main() {
 	flag.Parse()
 	files := flag.Args()
 	if !flagQuiet {
-		fmt.Printf("d64 %s by burglar\n", Version)
+		fmt.Printf("d64 %s by burg\n", Version)
 	}
 
 	showUsage := true
