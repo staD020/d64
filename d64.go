@@ -2,6 +2,7 @@
 package d64
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 )
+
+const Version = "0.3"
 
 // Definitions of .d64 requirements.
 const (
@@ -158,11 +161,18 @@ func (d Disk) String() string {
 	s := fmt.Sprintf("%q %q\n", d.Label, d.DiskID)
 	blocksFree := MaxBlocks
 	for _, e := range d.Directory() {
-		s += fmt.Sprintf("%3d %q prg\n", e.BlockSize, e.Filename)
+		s += fmt.Sprintf("%3d %-16q prg (tr %2d sec %2d start 0x%04x)\n", e.BlockSize, e.Filename, e.Track, e.Sector, d.StartAddress(e))
 		blocksFree -= e.BlockSize
 	}
-	s += fmt.Sprintf("%3d blocks free\n", blocksFree)
-	return s
+	return s + fmt.Sprintf("%3d blocks free\n", blocksFree)
+}
+
+// StartAddress extracts the start address from the first sector of the DirEntry.
+func (d Disk) StartAddress(e DirEntry) uint16 {
+	if e.Track > 0 {
+		return binary.LittleEndian.Uint16(d.Tracks[e.Track-1].Sectors[e.Sector].Data[2:4])
+	}
+	return 0
 }
 
 // WriteTo writes the disk to io.Writer, implementing the io.WriterTo interface.
@@ -448,23 +458,22 @@ func (d *Disk) Validate() {
 	return
 }
 
-// PrintBamTo prints a human readable representation of d.bam to the io.Writer.
+// PrintBAMTo prints a human readable representation of d.bam to the io.Writer.
 // Typical usage is writing to os.Stdout.
-func (d *Disk) PrintBamTo(w io.Writer) (n int, err error) {
-	for track := 1; track <= MaxTracks; track++ {
-		n, err = fmt.Fprintf(w, "track %2d: ", track)
+func (d *Disk) PrintBAMTo(w io.Writer) (n int, err error) {
+	for track := byte(1); track <= MaxTracks; track++ {
+		n, err = fmt.Fprintf(w, "%02d: ", track)
 		if err != nil {
 			return n, fmt.Errorf("fmt.Fprintf failed: %w", err)
 		}
-		for sector := range d.bam[track-1] {
-			used := "0"
-			if d.bam[track-1][sector] == true {
-				used = "1"
-			}
-			m, err := fmt.Fprintf(w, " %s", used)
-			n += m
-			if err != nil {
-				return n, fmt.Errorf("fmt.Fprintf failed: %w", err)
+		for sector := byte(0); sector < totalSectors(track); sector++ {
+			switch d.bam[track-1][sector] {
+			case true:
+				m, _ := fmt.Fprintf(w, "+")
+				n += m
+			case false:
+				m, _ := fmt.Fprintf(w, "-")
+				n += m
 			}
 		}
 		m, err := fmt.Fprintln(w)

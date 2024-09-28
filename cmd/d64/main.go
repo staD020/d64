@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -10,10 +11,9 @@ import (
 	"github.com/staD020/d64"
 )
 
-const Version = "0.2"
-
 var (
 	flagAdd       string
+	flagBAM       bool
 	flagDirectory string
 	flagExtract   string
 	flagHelp      bool
@@ -28,6 +28,8 @@ func init() {
 	flag.StringVar(&flagExtract, "e", "", "extract")
 	flag.StringVar(&flagDirectory, "dir", "", "prints the directory from .d64 (-dir d64.d64)")
 	flag.StringVar(&flagDirectory, "d", "", "dir")
+	flag.BoolVar(&flagBAM, "bam", false, "display BAM")
+	flag.BoolVar(&flagBAM, "b", false, "bam")
 
 	flag.BoolVar(&flagHelp, "help", false, "")
 	flag.BoolVar(&flagHelp, "h", false, "help")
@@ -42,7 +44,7 @@ func main() {
 	flag.Parse()
 	files := flag.Args()
 	if !flagQuiet {
-		fmt.Printf("d64 %s by burg\n", Version)
+		fmt.Printf("d64 %s by burg\n", d64.Version)
 	}
 
 	showUsage := true
@@ -75,10 +77,15 @@ func main() {
 			panic(err)
 		}
 		fmt.Println(d)
+		if flagBAM {
+			if _, err = d.PrintBAMTo(os.Stdout); err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	if showUsage || flagHelp {
-		fmt.Println("Usage: ./d64 [-v -q -h -a foo.d64 -d foo.d64 -e foo.d64] [FILE [FILES]]")
+		fmt.Println("Usage: ./d64 [-v -q -h -b -a foo.d64 -d foo.d64 -e foo.d64] [FILE [FILES]]")
 		fmt.Println()
 		flag.PrintDefaults()
 	}
