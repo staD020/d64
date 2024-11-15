@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-const Version = "0.3"
+const Version = "0.4"
 
 // Definitions of .d64 requirements.
 const (
@@ -287,7 +288,12 @@ func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 			filename = fmt.Sprintf("file%d", i)
 		}
 		path := filepath.Join(outDir, filename+".prg")
-		if err = os.WriteFile(path, d.Extract(e.Track, e.Sector), 0644); err != nil {
+		prg, err := d.Extract(e.Track, e.Sector)
+		if err != nil {
+			log.Printf("warn: skipping file %q d64.Extract(%d, %d): %v", e.Filename, e.Track, e.Sector, err)
+			continue
+		}
+		if err = os.WriteFile(path, prg, 0644); err != nil {
 			return paths, fmt.Errorf("os.WriteFile %q to %q failed: %w", e.Filename, outDir, err)
 		}
 		paths = append(paths, path)
@@ -296,7 +302,10 @@ func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 }
 
 // Extract returns the prg starting on track, sector.
-func (d Disk) Extract(track, sector byte) (prg []byte) {
+func (d Disk) Extract(track, sector byte) (prg []byte, err error) {
+	if track > MaxTracks {
+		return prg, fmt.Errorf("cannot extract from tracks above %d", MaxTracks)
+	}
 	for {
 		s := d.Tracks[track-1].Sectors[sector]
 		prg = append(prg, s.Bytes()...)
@@ -304,12 +313,15 @@ func (d Disk) Extract(track, sector byte) (prg []byte) {
 			break
 		}
 		track, sector = s.TrackLink(), s.SectorLink()
+		if track > MaxTracks {
+			return prg, fmt.Errorf("cannot extract from tracks above %d", MaxTracks)
+		}
 	}
-	return prg
+	return prg, err
 }
 
 // ExtractBoot returns the first prg found in the directory.
-func (d Disk) ExtractBoot() (prg []byte) {
+func (d Disk) ExtractBoot() (prg []byte, err error) {
 	boot := d.Directory()[0]
 	return d.Extract(boot.Track, boot.Sector)
 }

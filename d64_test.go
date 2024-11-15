@@ -21,7 +21,8 @@ const (
 	testD64DiskID   = "01 2a"
 	testD64NumFiles = 20
 
-	testWeirdD64 = "testdata/fuji_vol1.d64"
+	testWeirdD64    = "testdata/fuji_vol1.d64"
+	testBadAppleD64 = "testdata/badapple64.d64"
 )
 
 var testFileLength = []int{4421, 6921, 4752, 6675, 3918, 3471, 6251, 5710, 5578, 4011, 22529, 7325, 7794, 8964, 7768, 9452, 8948, 6306, 7339, 25089}
@@ -90,7 +91,10 @@ func TestDiskExtract(t *testing.T) {
 		t.Fatalf("LoadDisk %q error: %v", testD64, err)
 	}
 	for n, e := range d.Directory() {
-		prg := d.Extract(e.Track, e.Sector)
+		prg, err := d.Extract(e.Track, e.Sector)
+		if err != nil {
+			t.Errorf("d.Extract(%d, %d) %q failed: %v", e.Track, e.Sector, e.Filename, err)
+		}
 		if prg[0] != 0x01 || prg[1] != 0x08 {
 			t.Errorf("d.Extract(%d, %d) loadaddress for file %q is not $0801.", e.Track, e.Sector, e.Filename)
 		}
@@ -106,7 +110,10 @@ func TestDiskExtract2(t *testing.T) {
 		t.Fatalf("LoadDisk %q error: %v", testD64, err)
 	}
 	for n, e := range d.Directory() {
-		prg := d.Extract(e.Track, e.Sector)
+		prg, err := d.Extract(e.Track, e.Sector)
+		if err != nil {
+			t.Errorf("d.Extract(%d, %d) failed: %v", e.Track, e.Sector, err)
+		}
 		if len(prg) == 0 {
 			t.Errorf("d.Extract(%d, %d) length got %d want > 0", e.Track, e.Sector, len(prg))
 		}
@@ -229,7 +236,10 @@ func TestDiskAddFile(t *testing.T) {
 	}
 
 	for n, e := range d.Directory() {
-		prg := d.Extract(e.Track, e.Sector)
+		prg, err := d.Extract(e.Track, e.Sector)
+		if err != nil {
+			t.Errorf("d.Extract(%d, %d) failed: %v", e.Track, e.Sector, err)
+		}
 		if len(prg) != prgLengths[n] {
 			t.Errorf("file %q (tr %d sec %d) length mismatch. got %d want %d", e.Filename, e.Track, e.Sector, len(prg), prgLengths[n])
 		}
@@ -244,6 +254,23 @@ func TestExtractToPath(t *testing.T) {
 	defer os.RemoveAll(out)
 
 	d, err := LoadDisk(testD64)
+	if err != nil {
+		t.Fatalf("LoadDisk %q error: %v", testD64, err)
+	}
+
+	if _, err = d.ExtractToPath(out); err != nil {
+		t.Fatalf("d.ExtractToPath %q to %q error: %v", testD64, out, err)
+	}
+}
+
+func TestExtractToPath2(t *testing.T) {
+	out, err := ioutil.TempDir("", "testdiskextract2")
+	if err != nil {
+		t.Fatalf("ioutil.TempDir error: %v", err)
+	}
+	defer os.RemoveAll(out)
+
+	d, err := LoadDisk(testBadAppleD64)
 	if err != nil {
 		t.Fatalf("LoadDisk %q error: %v", testD64, err)
 	}
