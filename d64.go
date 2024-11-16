@@ -22,6 +22,7 @@ const (
 	MaxDiskIDSize   = 5
 
 	MaxTracks               = 35
+	MaxSectors              = 21
 	DirTrack                = 18
 	SectorSize              = 0x100
 	DefaultSectorInterleave = 10
@@ -302,22 +303,36 @@ func (d *Disk) ExtractToPath(outDir string) (paths []string, err error) {
 }
 
 // Extract returns the prg starting on track, sector.
+// Returns an error when there are issues with invalid track,sector links.
 func (d Disk) Extract(track, sector byte) (prg []byte, err error) {
-	if track > MaxTracks {
-		return prg, fmt.Errorf("cannot extract from tracks above %d", MaxTracks)
+	if err = sectorIsValid(track, sector); err != nil {
+		return prg, err
 	}
+	used := [MaxTracks][MaxSectors]bool{}
 	for {
+		if used[track-1][sector] {
+			return prg, fmt.Errorf("loop detected on track %d, sector %d: it was already used in this file", track, sector)
+		}
 		s := d.Tracks[track-1].Sectors[sector]
 		prg = append(prg, s.Bytes()...)
+		used[track-1][sector] = true
 		if s.TrackLink() == 0 {
 			break
 		}
 		track, sector = s.TrackLink(), s.SectorLink()
-		if track > MaxTracks {
-			return prg, fmt.Errorf("cannot extract from tracks above %d", MaxTracks)
+		if err = sectorIsValid(track, sector); err != nil {
+			return prg, err
 		}
 	}
 	return prg, err
+}
+
+// sectorIsValid returns an error if the track or sector is invalid.
+func sectorIsValid(track, sector byte) error {
+	if track < 1 || track > MaxTracks || sector >= totalSectors(track) {
+		return fmt.Errorf("illegal track or sector: %d, %d", track, sector)
+	}
+	return nil
 }
 
 // ExtractBoot returns the first prg found in the directory.
@@ -352,10 +367,7 @@ func (s Sector) directoryEntries() (dirEntries []DirEntry) {
 			filename += string(s.Data[i+3+j])
 		}
 		track, sector := s.Data[i+1], s.Data[i+2]
-		if track < 1 || track > MaxTracks {
-			continue
-		}
-		if sector >= totalSectors(track) {
+		if err := sectorIsValid(track, sector); err != nil {
 			continue
 		}
 		dirEntries = append(dirEntries, DirEntry{
@@ -415,7 +427,6 @@ func (d *Disk) addFileToDirectory(firstTrack, firstSector byte, filename string,
 	nextTrack, nextSector, err := d.nextFreeSector(byte(track), byte(sector))
 	if err != nil {
 		return fmt.Errorf("d.nextFreeSector for dir entry %q failed: %w", name, err)
-
 	}
 	d.Tracks[track-1].Sectors[sector].Data[0] = nextTrack
 	d.Tracks[track-1].Sectors[sector].Data[1] = nextSector
@@ -447,6 +458,10 @@ func (d Disk) Directory() (dir []DirEntry) {
 			return dir
 		}
 		track, sector = s.TrackLink(), s.SectorLink()
+		if err := sectorIsValid(track, sector); err != nil {
+			log.Printf("warn: skipping linked directory sector: %v", err)
+			return dir
+		}
 	}
 	return dir
 }
@@ -672,8 +687,13 @@ var re = regexp.MustCompile("[^0-9a-z ._+]")
 // NormalizeFilename trims and normalizes a filename to fit .d64 restrictions.
 func NormalizeFilename(f string) string {
 	n := strings.TrimSpace(re.ReplaceAllString(strings.ToLower(f), ""))
-	if n == "." || n == ".." {
+	switch n {
+	case "":
+		return "emptyfilename"
+	case ".":
 		return "dot"
+	case "..":
+		return "dotdot"
 	}
 	if len(n) > MaxFilenameSize {
 		return strings.TrimSpace(n[:MaxFilenameSize])

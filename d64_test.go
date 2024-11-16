@@ -280,6 +280,38 @@ func TestExtractToPath2(t *testing.T) {
 	}
 }
 
+func TestBadApple(t *testing.T) {
+	out, err := ioutil.TempDir("", "testdiskextract2")
+	if err != nil {
+		t.Fatalf("ioutil.TempDir error: %v", err)
+	}
+	defer os.RemoveAll(out)
+
+	d, err := LoadDisk(testBadAppleD64)
+	if err != nil {
+		t.Fatalf("LoadDisk %q error: %v", testD64, err)
+	}
+
+	dir := d.Directory()
+	const numFiles = 16
+	if len(dir) != numFiles {
+		t.Errorf("failed d.Directory numFiles %d != %d", len(dir), numFiles)
+	}
+
+	var ok, nok uint
+	for _, f := range dir {
+		_, err := d.Extract(f.Track, f.Sector)
+		if err == nil {
+			ok++
+		} else {
+			nok++
+		}
+	}
+	if ok != 15 || nok != 1 {
+		t.Errorf("d.Extract BadApple should have failed once, but failed %d times", nok)
+	}
+}
+
 func TestLongPrg(t *testing.T) {
 	const longInterleave = 8
 	d := NewDisk("long prg", "long", longInterleave)
@@ -332,11 +364,12 @@ func TestNormalizeFilename(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"", ""},
+		{"", "emptyfilename"},
+		{" ", "emptyfilename"},
 		{".", "dot"},
 		{"./", "dot"},
-		{"..", "dot"},
-		{"../", "dot"},
+		{"..", "dotdot"},
+		{"../", "dotdot"},
 		{"filename", "filename"},
 		{"File.Name", "file.name"},
 		{" filename ", "filename"},
