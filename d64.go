@@ -597,7 +597,6 @@ func (d Disk) nextFreeSector(currentTrack, currentSector byte) (track, sector by
 		if !dirSector && track == DirTrack {
 			continue
 		}
-
 		currentSector = (currentSector + interleave) % totalSectors(track)
 		for sector = currentSector; sector < totalSectors(track); sector++ {
 			if d.bam[track-1][sector] == false {
@@ -622,6 +621,7 @@ func (d *Disk) AddFile(path, filename string) error {
 	return d.AddPrg(NormalizeFilename(filename), prg)
 }
 
+// AddPrgFromReader reads the prg from r and adds the file on the disk with filename.
 func (d *Disk) AddPrgFromReader(filename string, r io.Reader) error {
 	buf, err := io.ReadAll(r)
 	if err != nil {
@@ -639,7 +639,6 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 	if err != nil {
 		return fmt.Errorf("d.freeSector failed: %w", err)
 	}
-
 	if err = d.addFileToDirectory(track, sector, filename, len(prg)); err != nil {
 		return fmt.Errorf("d.addFileToDirectory %q failed: %w", filename, err)
 	}
@@ -650,10 +649,8 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 	// drain buffer with writing full sectors
 	for len(buf) > BlockSize {
 		d.bam[track-1][sector] = true
-
 		var sectorContent []byte
 		sectorContent, buf = buf[0:BlockSize], buf[BlockSize:]
-
 		nextTrack, nextSector, err := d.nextFreeSector(track, sector)
 		if err != nil {
 			return fmt.Errorf("d.nextFreeSector track %d sector %d failed: %w", track, sector, err)
@@ -664,7 +661,6 @@ func (d *Disk) AddPrg(filename string, prg []byte) error {
 		for i, v := range sectorContent {
 			d.Tracks[track-1].Sectors[sector].Data[2+i] = v
 		}
-
 		track, sector = nextTrack, nextSector
 	}
 
